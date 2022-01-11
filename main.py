@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, status
 from pydantic import BaseModel
 from typing import Optional
 from pydantic.config import Extra
@@ -71,12 +71,11 @@ def get_accounts(searchName: Optional[str] = None):
 @app.get("/accounts{id}")
 def get_account(id: str):
     account = check_account(id)
-    if account is None:
-        return {"msg": "Id not found"}
+
     return account
 
 
-@app.post("/accounts")
+@app.post("/accounts", status_code=status.HTTP_201_CREATED)
 def create_account(body: Accounts):
 
     newAccount = {
@@ -94,9 +93,6 @@ def create_account(body: Accounts):
 @app.put("/accounts/{id}")
 def update_account(id: str, body: Accounts):
     account = check_account(id)
-
-    if account is None:
-        return {"msg": "Id not found"}
 
     for acc in ACCOUNTS:
         if acc["id"] == account["id"]:
@@ -131,4 +127,8 @@ def check_account(id: str):
     for account in ACCOUNTS:
         if id.lower() == account["id"].lower():
             return account
-    return None
+    raise HTTPException(
+        status_code=404,
+        detail="Account not found",
+        headers={"error": "Account ID doesn't exist"},
+    )
