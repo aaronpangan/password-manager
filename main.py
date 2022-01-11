@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
 from typing import Optional
+from pydantic.config import Extra
 from pydantic.fields import Field
 from uuid import UUID, uuid4
 
@@ -9,7 +10,6 @@ app = FastAPI()
 
 
 class Accounts(BaseModel):
-    id: UUID
     accountName: str = Field(min_length=1, title="Name of the Account")
     password: str = Field(min_length=1, title="Password of the Account")
     accountDescription: Optional[str] = Field(
@@ -17,6 +17,7 @@ class Accounts(BaseModel):
     )
 
     class Config:
+        extra = Extra.allow
         schema_extra = {
             "example": {
                 "accountName": "Google",
@@ -54,14 +55,6 @@ ACCOUNTS = [
 ]
 
 
-@app.post("/accounts")
-def create_account(body: Accounts):
-    body["id"] = uuid4()
-    ACCOUNTS.append(body)
-
-    return body
-
-
 @app.get("/accounts")
 def get_accounts(searchName: Optional[str] = None):
 
@@ -75,5 +68,67 @@ def get_accounts(searchName: Optional[str] = None):
     return ACCOUNTS
 
 
-# @app.put("/accounts/{account_id}"})
-# def update_account(account_id: UUID):
+@app.get("/accounts{id}")
+def get_account(id: str):
+    account = check_account(id)
+    if account is None:
+        return {"msg": "Id not found"}
+    return account
+
+
+@app.post("/accounts")
+def create_account(body: Accounts):
+
+    newAccount = {
+        "id": str(uuid4()),
+        "accountName": body.accountName,
+        "password": body.password,
+        "accountDescription": body.accountDescription,
+    }
+
+    ACCOUNTS.append(newAccount)
+
+    return newAccount
+
+
+@app.put("/accounts/{id}")
+def update_account(id: str, body: Accounts):
+    account = check_account(id)
+
+    if account is None:
+        return {"msg": "Id not found"}
+
+    for acc in ACCOUNTS:
+        if acc["id"] == account["id"]:
+            acc.update(
+                {
+                    "accountName": body.accountName,
+                    "password": body.password,
+                    "accountDescription": body.accountDescription,
+                }
+            )
+            return acc
+
+
+@app.delete("/accounts/{id}")
+def delete_account(id: str):
+    account = check_account(id)
+    if account is None:
+        return {"msg": "Id not found"}
+
+    # for index in range(len(ACCOUNTS)):
+    #     if ACCOUNTS[index]["id"] == account["id"]:
+    #         ACCOUNTS.pop(index)
+
+    ACCOUNTS.remove(account)
+
+    print(ACCOUNTS)
+
+    return {"msg": "Successfully Deleted"}
+
+
+def check_account(id: str):
+    for account in ACCOUNTS:
+        if id.lower() == account["id"].lower():
+            return account
+    return None
