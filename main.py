@@ -4,6 +4,7 @@ from typing import Optional
 from pydantic.config import Extra
 from pydantic.fields import Field
 from uuid import UUID, uuid4
+import db
 
 
 app = FastAPI()
