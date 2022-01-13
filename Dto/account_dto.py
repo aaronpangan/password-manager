@@ -4,11 +4,10 @@ from pydantic.fields import Field
 from pydantic import BaseModel
 
 
-
 class CreateAccount(BaseModel):
-    accountName: str = Field(min_length=1, title="Name of the Account")
+    account_name: str = Field(min_length=1, title="Name of the Account")
     password: str = Field(min_length=1, title="Password of the Account")
-    accountDescription: Optional[str] = Field(
+    account_description: Optional[str] = Field(
         "N/A", title="Description of the Account", max_length=100
     )
 

@@ -1,12 +1,12 @@
-import models
+import Account.account_model as account_model
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
-from Dto import accountDto, userDto
+from Dto import account_dto, user_dto
 
 
 def get_accounts(searchName, db: Session):
 
-    accounts = db.query(models.Account).all()
+    accounts = db.query(account_model.Account).all()
 
     if searchName:
         accounts = list(
@@ -18,11 +18,11 @@ def get_accounts(searchName, db: Session):
     return accounts
 
 
-def create_account(body: accountDto.CreateAccount, db: Session):
-    newAccount = models.Account(
-        accountName=body.accountName,
+def create_account(body: account_dto.CreateAccount, db: Session):
+    newAccount = account_model.Account(
+        account_name=body.accountName,
         password=body.password,
-        accountDescription=body.accountDescription,
+        account_description=body.account_description,
     )
     db.add(newAccount)
     db.commit()
@@ -30,29 +30,32 @@ def create_account(body: accountDto.CreateAccount, db: Session):
     return newAccount
 
 
-def update_account(id: int, body: accountDto.CreateAccount, db: Session):
+def update_account(id: int, body: account_dto.CreateAccount, db: Session):
     account = check_account(id, db)
 
-    account.accountName=body.accountName
-    account.password=body.password
-    account.accountDescription=body.accountDescription
+    account.account_name = body.account_name
+    account.password = body.password
+    account.account_description = body.account_description
     db.add(account)
     db.commit()
     db.refresh(account)
     return account
 
-def delete_account(id:int, db: Session):
+
+def delete_account(id: int, db: Session):
     check_account(id, db)
 
-    db.query(models.Account).filter(models.Account.id == id).delete()
+    db.query(account_model.Account).filter(account_model.Account.id == id).delete()
 
     db.commit()
 
-    return {'msg': 'Successfully Deleted'}
+    return {"msg": "Successfully Deleted"}
 
 
 def check_account(id: int, db: Session):
-    account = db.query(models.Account).filter(models.Account.id == id).first()
+    account = (
+        db.query(account_model.Account).filter(account_model.Account.id == id).first()
+    )
 
     if account is not None:
         return account
