@@ -6,6 +6,7 @@ from Dto import user_dto
 from sqlalchemy.orm import Session
 import database
 from . import user_service
+from fastapi.security import OAuth2PasswordBearer
 
 
 get_db = database.get_db
@@ -26,3 +27,8 @@ def create_user(body: user_dto.CreateUser, db: Session = Depends(get_db)):
 @router.post("/login")
 def login(body: user_dto.CreateUser, db: Session = Depends(get_db)):
     return user_service.login(body, db)
+
+
+@router.post("/checktoken")
+def check_token(token: str = Depends(OAuth2PasswordBearer(tokenUrl="token"))):
+    return user_service.validate_jwt(token)
