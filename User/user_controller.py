@@ -39,3 +39,10 @@ def generate_code(
     user=Depends(user_service.validate_jwt), db: Session = Depends(get_db)
 ):
     return user_service.generate_code(user, db)
+
+
+@router.post("/verify_token/{code}")
+def verify_token(
+    code: int, user=Depends(user_service.validate_jwt), db: Session = Depends(get_db)
+):
+    return user_service.verify_code(code, user, db)

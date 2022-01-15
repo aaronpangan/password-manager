@@ -130,25 +130,24 @@ def check_payload(jwt_payload, db: Session):
 def generate_code(user: user_model.User, db: Session):
     code_table = user_model.VerificationCode
 
-    if check_code_expiry(user, db):
+    check_code_exist(user, db)
 
-        codes = db.query(code_table).filter(code_table.owner_Id == user.id).delete()
+    db.query(code_table).filter(code_table.owner_Id == user.id).delete()
 
-        db.commit()
+    db.commit()
+    new_code = code_table(
+    code=int(random.randint(100000, 999999)),
+    owner_Id=user.id,
+    expiry=datetime.now() + timedelta(minutes=5),
+    )
+    db.add(new_code)
+    db.commit()
+    db.refresh(new_code)
 
-        new_code = code_table(
-        code=int(random.randint(100000, 999999)),
-        owner_Id=user.id,
-        expiry=datetime.now() + timedelta(minutes=5),
-        )
-        db.add(new_code)
-        db.commit()
-        db.refresh(new_code)
-
-        return new_code
+    return new_code
 
 
-def check_code_expiry(user: user_model.User, db: Session):
+def check_code_exist(user: user_model.User, db: Session):
     code_table = user_model.VerificationCode
     code = db.query(code_table).filter(code_table.owner_Id == user.id).first()
 
@@ -162,3 +161,11 @@ def check_code_expiry(user: user_model.User, db: Session):
             )
       
     return True
+
+def verify_code(code : int, user: user_model.User, db:Session):
+    check_code_exist(user, db)
+    code_table = user_model.VerificationCode
+    user_table = user_model.User
+    isVerified = db.query(code_table).filter(code_table.id == code)
+    
+    return isVerified
