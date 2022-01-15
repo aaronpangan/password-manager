@@ -30,5 +30,12 @@ def login(body: user_dto.CreateUser, db: Session = Depends(get_db)):
 
 
 @router.post("/checktoken")
-def check_token(token: str = Depends(OAuth2PasswordBearer(tokenUrl="token"))):
-    return user_service.validate_jwt(token)
+def check_token(user=Depends(user_service.validate_jwt)):
+    return user
+
+
+@router.post("/generate-code")
+def generate_code(
+    user=Depends(user_service.validate_jwt), db: Session = Depends(get_db)
+):
+    return user_service.generate_code(user, db)

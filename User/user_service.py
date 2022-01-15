@@ -1,19 +1,22 @@
-from time import timezone
+import random
+from time import time, timezone
 import User.user_model as user_model
 from sqlalchemy.orm import Session
 from fastapi.params import Depends
-from fastapi import HTTPException
+from fastapi import HTTPException, status
 from Dto import account_dto, user_dto
 from passlib.hash import bcrypt
 from fastapi.security import OAuth2PasswordRequestForm, OAuth2PasswordBearer
 from datetime import datetime, timedelta, timezone
-from jose import jwt
+from jose import jwt, JWTError
 import os
 from dotenv import load_dotenv
 from typing import Optional
 from dateutil import parser
+import database
 
 load_dotenv()
+get_db = database.get_db
 
 
 def find_user(id: int, db: Session):
@@ -45,8 +48,7 @@ def register(body: user_dto.CreateUser, db: Session):
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
-
-    return hash_password
+    return generate_jwt(new_user)
 
 
 def login(body: user_dto.CreateUser, db: Session):
@@ -76,9 +78,7 @@ def verify_hash(password, hashed_password):
     return bcrypt.verify(password, hashed_password)
 
 
-def generate_jwt(
-    body: OAuth2PasswordRequestForm = Depends(), expires: Optional[timedelta] = None
-):
+def generate_jwt(body: OAuth2PasswordRequestForm = Depends()):
 
     expire = datetime.now(timezone.utc).astimezone() + timedelta(minutes=15)
 
@@ -87,13 +87,78 @@ def generate_jwt(
     return jwt.encode(jwt_payload, os.getenv("secretKey"), algorithm="HS256")
 
 
-def validate_jwt(token: str):
+def validate_jwt(
+    token: str = Depends(OAuth2PasswordBearer(tokenUrl="token")),
+    db: Session = Depends(get_db),
+):
+    removeQuotes = token.replace('"', "")
+    try:
+        jwt_payload = jwt.decode(
+            removeQuotes, os.getenv("secretKey"), algorithms="HS256"
+        )
 
-    removeQuotes = token.split('"')[1]
-    jwt_payload = jwt.decode(removeQuotes, os.getenv("secretKey"), algorithms="HS256")
+        return check_payload(jwt_payload, db)
 
-    print(
-        parser.parse(jwt_payload["expiration"])
-        - datetime.now(timezone.utc).astimezone()
+    except JWTError:
+
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Could not validate credentials",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+
+def check_payload(jwt_payload, db: Session):
+
+    user = (
+        db.query(user_model.User)
+        .filter(
+            user_model.User.id == jwt_payload["id"],
+            user_model.User.email == jwt_payload["email"],
+        )
+        .first()
     )
-    return jwt_payload
+    if user is None:
+        raise HTTPException(
+            status_code=404,
+            detail="User not found",
+            headers={"error": "User doesn't exist"},
+        )
+    return user
+
+
+def generate_code(user: user_model.User, db: Session):
+    code_table = user_model.VerificationCode
+
+    if check_code_expiry(user, db):
+
+        codes = db.query(code_table).filter(code_table.owner_Id == user.id).delete()
+
+        db.commit()
+
+        new_code = code_table(
+        code=int(random.randint(100000, 999999)),
+        owner_Id=user.id,
+        expiry=datetime.now() + timedelta(minutes=5),
+        )
+        db.add(new_code)
+        db.commit()
+        db.refresh(new_code)
+
+        return new_code
+
+
+def check_code_expiry(user: user_model.User, db: Session):
+    code_table = user_model.VerificationCode
+    code = db.query(code_table).filter(code_table.owner_Id == user.id).first()
+
+    if code is not None:
+        if code.expiry >= datetime.now():
+
+            raise HTTPException(
+                status_code=403,
+                detail="Code already sent to the email",
+                headers={"error": "Code is still valid"},
+            )
+      
+    return True
