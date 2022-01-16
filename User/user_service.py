@@ -136,9 +136,9 @@ def generate_code(user: user_model.User, db: Session):
 
     db.commit()
     new_code = code_table(
-    code=int(random.randint(100000, 999999)),
-    owner_Id=user.id,
-    expiry=datetime.now() + timedelta(minutes=5),
+        code=int(random.randint(100000, 999999)),
+        owner_Id=user.id,
+        expiry=datetime.now() + timedelta(minutes=5),
     )
     db.add(new_code)
     db.commit()
@@ -159,13 +159,39 @@ def check_code_exist(user: user_model.User, db: Session):
                 detail="Code already sent to the email",
                 headers={"error": "Code is still valid"},
             )
-      
-    return True
 
-def verify_code(code : int, user: user_model.User, db:Session):
-    check_code_exist(user, db)
+    return None
+
+
+def verify_code(code: int, user: user_model.User, db: Session):
     code_table = user_model.VerificationCode
     user_table = user_model.User
-    isVerified = db.query(code_table).filter(code_table.id == code)
-    
-    return isVerified
+    check_code = (
+        db.query(code_table)
+        .filter(code_table.code == code, code_table.owner_Id == user.id)
+        .first()
+    )
+
+    check_code_error(check_code)
+
+    db.query(code_table).filter(code_table.owner_Id == user.id).delete()
+    user.is_verified = True
+    db.commit()
+
+    return {"msg", "Successfully Verified"}
+
+
+def check_code_error(code: user_model.VerificationCode):
+    if code is None:
+        raise HTTPException(
+            status_code=403,
+            detail="Wrong Code",
+            headers={"error": "Wrong Code"},
+        )
+
+    if code.expiry < datetime.now():
+        raise HTTPException(
+            status_code=403,
+            detail="Code Expired",
+            headers={"error": "Code Expired"},
+        )
